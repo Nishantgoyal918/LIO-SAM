@@ -57,7 +57,7 @@ using namespace std;
 
 typedef pcl::PointXYZI PointType;
 
-enum class SensorType { VELODYNE, OUSTER };
+enum class SensorType { VELODYNE, OUSTER, CARLA };
 
 class ParamServer
 {
@@ -96,6 +96,11 @@ public:
     int downsampleRate;
     float lidarMinRange;
     float lidarMaxRange;
+    float verticalAngleTop;
+    float verticalAngleBottom;
+    float _ang_resolution_Y;
+    float _ang_bottom;
+
 
     // IMU
     float imuAccNoise;
@@ -182,6 +187,10 @@ public:
         {
             sensor = SensorType::OUSTER;
         }
+        else if(sensorStr == "carla")
+        {
+            sensor = SensorType::CARLA;
+        }
         else
         {
             ROS_ERROR_STREAM(
@@ -194,6 +203,11 @@ public:
         nh.param<int>("lio_sam/downsampleRate", downsampleRate, 1);
         nh.param<float>("lio_sam/lidarMinRange", lidarMinRange, 1.0);
         nh.param<float>("lio_sam/lidarMaxRange", lidarMaxRange, 1000.0);
+        nh.param<float>("lio_sam/verticalAngleTop", verticalAngleTop, 10.0);
+        nh.param<float>("lio_sam/verticalAngleBottom", verticalAngleBottom, -30.0);
+
+        _ang_resolution_Y = (M_PI / 180.0) * (verticalAngleTop - verticalAngleBottom) / float(N_SCAN-1);
+        _ang_bottom = -( verticalAngleBottom - 0.1) * (M_PI / 180.0);
 
         nh.param<float>("lio_sam/imuAccNoise", imuAccNoise, 0.01);
         nh.param<float>("lio_sam/imuGyrNoise", imuGyrNoise, 0.001);

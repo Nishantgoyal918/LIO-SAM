@@ -30,6 +30,10 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(OusterPointXYZIRT,
     (uint8_t, ring, ring) (uint16_t, noise, noise) (uint32_t, range, range)
 )
 
+
+
+
+
 // Use the Velodyne point format as a common representation
 using PointXYZIRT = VelodynePointXYZIRT;
 
@@ -68,6 +72,9 @@ private:
 
     pcl::PointCloud<PointXYZIRT>::Ptr laserCloudIn;
     pcl::PointCloud<OusterPointXYZIRT>::Ptr tmpOusterCloudIn;
+
+    pcl::PointCloud<PointType>::Ptr tmpLaserCloudInCarla;
+
     pcl::PointCloud<PointType>::Ptr   fullCloud;
     pcl::PointCloud<PointType>::Ptr   extractedCloud;
 
@@ -109,6 +116,8 @@ public:
         fullCloud.reset(new pcl::PointCloud<PointType>());
         extractedCloud.reset(new pcl::PointCloud<PointType>());
 
+        tmpLaserCloudInCarla.reset(new pcl::PointCloud<PointType>());
+
         fullCloud->points.resize(N_SCAN*Horizon_SCAN);
 
         cloudInfo.startRingIndex.assign(N_SCAN, 0);
@@ -124,6 +133,9 @@ public:
     {
         laserCloudIn->clear();
         extractedCloud->clear();
+
+        tmpLaserCloudInCarla->clear();
+
         // reset range matrix for range image projection
         rangeMat = cv::Mat(N_SCAN, Horizon_SCAN, CV_32F, cv::Scalar::all(FLT_MAX));
 
@@ -222,6 +234,24 @@ public:
                 dst.time = src.t * 1e-9f;
             }
         }
+        else if(sensor == SensorType::CARLA)
+        {
+            pcl::moveFromROSMsg(currentCloudMsg, *tmpLaserCloudInCarla);
+            laserCloudIn->points.resize(tmpLaserCloudInCarla->size());
+            laserCloudIn->is_dense = tmpLaserCloudInCarla->is_dense;
+            
+            for(size_t i = 0; i < tmpLaserCloudInCarla->size(); i++)
+            {
+                auto &src = tmpLaserCloudInCarla->points[i];
+                auto &dst = laserCloudIn->points[i];
+                dst.x = src.x;
+                dst.y = src.y;
+                dst.z = src.z;
+                dst.intensity = src.intensity;
+                float verticalAngle = atan2(tmpLaserCloudInCarla->points[i].z, sqrt(tmpLaserCloudInCarla->points[i].x * tmpLaserCloudInCarla->points[i].x + tmpLaserCloudInCarla->points[i].y * tmpLaserCloudInCarla->points[i].y)) * 180 / M_PI;
+                dst.ring = (verticalAngle + _ang_bottom) / _ang_resolution_Y;
+            }
+        }
         else
         {
             ROS_ERROR_STREAM("Unknown sensor type: " << int(sensor));
@@ -255,8 +285,12 @@ public:
             }
             if (ringFlag == -1)
             {
-                ROS_ERROR("Point cloud ring channel not available, please configure your point cloud data!");
-                ros::shutdown();
+
+                if(sensor != SensorType::CARLA)
+                {
+                    ROS_ERROR("Point cloud ring channel not available, please configure your point cloud data!");
+                    ros::shutdown();
+                }
             }
         }
 
