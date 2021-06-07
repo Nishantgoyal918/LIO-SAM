@@ -237,8 +237,16 @@ public:
         else if(sensor == SensorType::CARLA)
         {
             pcl::moveFromROSMsg(currentCloudMsg, *tmpLaserCloudInCarla);
+
+            if(tmpLaserCloudInCarla->is_dense == false)
+            {
+                std::vector<int> indices;
+                pcl::removeNaNFromPointCloud(*tmpLaserCloudInCarla, *tmpLaserCloudInCarla, indices);
+            }
+
             laserCloudIn->points.resize(tmpLaserCloudInCarla->size());
-            laserCloudIn->is_dense = tmpLaserCloudInCarla->is_dense;
+            // laserCloudIn->is_dense = tmpLaserCloudInCarla->is_dense;
+            laserCloudIn->is_dense = true;
             
             for(size_t i = 0; i < tmpLaserCloudInCarla->size(); i++)
             {
